@@ -1,13 +1,12 @@
 import { Express } from "express";
-import users from "../Database/users";
 import db from "../Database";
-import authenticate from "../Account/authentication";
+import { authenticated, authenticatedUser } from "../Account/authentication";
 import { removingPassword } from "../Database/helpers";
 
 const UserRoutes = (app: Express) => {
   app.get("/user/:id", async (req, res) => {
     const { id } = req.params;
-    const user = users.find((user) => user._id === id);
+    const user = db.users.find((user) => user._id === id);
     if (user) {
       res.send(user);
     } else {
@@ -40,7 +39,7 @@ const UserRoutes = (app: Express) => {
   });
   app.post("/user/:id/following/:followingId", async (req, res) => {
     const { id, followingId } = req.params;
-    if (!authenticate(req, res, id)) {
+    if (!authenticated(req, res, id)) {
       return;
     }
     db.users = db.users.map((user) => {
@@ -54,11 +53,11 @@ const UserRoutes = (app: Express) => {
         return user;
       }
     });
-    res.sendStatus(200);
+    res.send(followingId);
   });
   app.delete("/user/:id/following/:followingId", async (req, res) => {
     const { id, followingId } = req.params;
-    if (!authenticate(req, res, id)) {
+    if (!authenticated(req, res, id)) {
       return;
     }
     db.users = db.users.map((user) => {
@@ -75,6 +74,21 @@ const UserRoutes = (app: Express) => {
       }
     });
     res.sendStatus(200);
+  });
+  app.get("/user/:id/reviews", async (req, res) => {
+    const { id } = req.params;
+    const reviews = db.reviews.filter((review) => review.userId === id);
+    res.send(reviews);
+  });
+  app.get("/user/:id/likes", async (req, res) => {
+    const { id } = req.params;
+    const reviews = db.reviews.filter((review) => review.likes.includes(id));
+    res.send(reviews);
+  });
+  app.get("/user/:id/lists", async (req, res) => {
+    const { id } = req.params;
+    const lists = db.lists.filter((list) => list.userId === id);
+    res.send(lists);
   });
 };
 export default UserRoutes;

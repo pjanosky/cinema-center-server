@@ -1,38 +1,40 @@
 import express from "express";
-import { User } from "../Database/types";
-import { SessionData } from "express-session";
 
-export default function authenticate(
+export function authenticated(
   req: express.Request,
   res: express.Response,
-  id: string
-): User | undefined {
+  id?: string
+) {
   const user = req.session.user;
-  if (user && user._id === id) {
-    return user;
+  if (!user || user._id !== id) {
+    res.sendStatus(401);
+    return undefined;
   }
-  res.status(401).send("unauthenticated");
-  return undefined;
+  return user;
 }
 
-export function authenticateUser(
+export function authenticatedUser(
   req: express.Request,
   res: express.Response,
-  id: string
+  id?: string
 ) {
-  const user = authenticate(req, res, id);
-  if (user && user.role != "user") {
-    res.status(401).send("unauthenticated");
+  const user = req.session.user;
+  if (!user || user.role !== "user" || (id && id !== user._id)) {
+    res.sendStatus(401);
+    return undefined;
   }
+  return user;
 }
 
-export function authenticateEditor(
+export function authenticatedEditor(
   req: express.Request,
   res: express.Response,
-  id: string
+  id?: string
 ) {
-  const user = authenticate(req, res, id);
-  if (user && user.role != "editor") {
-    res.status(401).send("unauthenticated");
+  const user = req.session.user;
+  if (!user || user.role !== "editor" || (id && id !== user._id)) {
+    res.sendStatus(401);
+    return undefined;
   }
+  return user;
 }

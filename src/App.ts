@@ -7,6 +7,8 @@ import "dotenv/config";
 import UserRoutes from "./Users/routes";
 import SearchRoutes from "./Search/routes";
 import MovieRoutes from "./Movies/routes";
+import ReviewRoutes from "./Reviews/routes";
+import ListRoutes from "./Lists/routes";
 
 const app = express();
 app.use(
@@ -29,6 +31,8 @@ AccountRoutes(app);
 UserRoutes(app);
 SearchRoutes(app);
 MovieRoutes(app);
+ReviewRoutes(app);
+ListRoutes(app);
 
 app.get("/", (req, res) => {
   res.send("Welcome the the cinema center server!");

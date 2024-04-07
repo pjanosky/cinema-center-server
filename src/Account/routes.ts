@@ -24,7 +24,7 @@ export default function AccountRoutes(app: express.Express) {
     } else if (password == "") {
       res.status(400).send("Invalid password");
       return;
-    } else if (role !== "user" || role != "editor") {
+    } else if (role !== "user" && role != "editor") {
       res.status(400).send("Invalid role");
       return;
     } else if (
@@ -156,6 +156,12 @@ export default function AccountRoutes(app: express.Express) {
       return;
     }
     db.users = db.users.filter((user) => user._id !== id);
-    res.send("success");
+    req.session.destroy((error) => {
+      if (error) {
+        res.sendStatus(500);
+      } else {
+        res.send("success");
+      }
+    });
   });
 }
