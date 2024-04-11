@@ -1,94 +1,273 @@
 import { Express } from "express";
-import db from "../Database";
-import { authenticated, authenticatedUser } from "../Account/authentication";
-import { removingPassword } from "../Database/helpers";
+import { authenticated } from "../authentication";
+import * as dao from "./dao";
+import * as reviewDao from "../Reviews/dao";
+import { NewUser, User } from "./types";
+
+declare module "express-session" {
+  interface SessionData {
+    user: User | undefined;
+  }
+}
 
 const UserRoutes = (app: Express) => {
-  app.get("/user/:id", async (req, res) => {
-    const { id } = req.params;
-    const user = db.users.find((user) => user._id === id);
+  // User Routes
+  app.get("/users/:userId", async (req, res) => {
+    let { userId } = req.params;
+    if (userId === "me") {
+      if (!req.session.user) {
+        res.sendStatus(401);
+        return;
+      }
+      userId = req.session.user._id;
+    }
+    const user = await dao.findUserById(userId);
     if (user) {
       res.send(user);
     } else {
       res.sendStatus(404);
     }
   });
-  app.get("/user/:id/following", async (req, res) => {
-    const { id } = req.params;
-    const user = db.users.find((user) => user._id === id);
+
+  app.get("/users", async (req, res) => {
+    const { likedReview, query } = req.query;
+    if ([likedReview, query].every((param) => !param)) {
+      res.status(400).send("must specify a query parameter");
+      return;
+    }
+
+    if (query) {
+      const users = await dao.findUsersByQuery(query as string);
+      res.send(users);
+    } else {
+      const review = await reviewDao.findReviewById(likedReview as string);
+      if (!review) {
+        res.sendStatus(404);
+        return;
+      }
+      const users = await dao.findUsersByUserIds(review.likes);
+      res.send(users);
+    }
+  });
+
+  app.post("/users", async (req, res) => {
+    const { name, email, username, password, role } = req.body;
+    if (!name) {
+      res.status(400).send("Invalid name");
+      return;
+    } else if (!email) {
+      res.status(400).send("Invalid email");
+      return;
+    } else if (!username) {
+      res.status(400).send("Invalid username");
+      return;
+    } else if (!password) {
+      res.status(400).send("Invalid password");
+      return;
+    } else if (!["user", "editor"].includes(role)) {
+      res.status(400).send("Invalid role");
+      return;
+    }
+    const [duplicateUsername, duplicateEmail] = await Promise.all([
+      dao.findUserByUsername(username),
+      dao.findUserByEmail(email),
+    ]);
+    if (duplicateUsername) {
+      res.status(400).send("Username is taken");
+      return;
+    } else if (duplicateEmail) {
+      res.status(400).send("Email is taken");
+      return;
+    }
+
+    const user: NewUser = {
+      username: username.toLowerCase(),
+      password,
+      name,
+      email: email.toLowerCase(),
+      role,
+      following: [],
+    };
+    const newUser = await dao.createUser(user);
+    if (!newUser) {
+      res.sendStatus(400);
+      return;
+    }
+    res.send(newUser);
+  });
+
+  app.put("/users/:userId/account", async (req, res) => {
+    const { userId } = req.params;
+    if (!authenticated(req, userId)) {
+      res.sendStatus(401);
+      return;
+    }
+
+    const { username, name, email } = req.body;
+    if (!name) {
+      res.status(400).send("Invalid name");
+      return;
+    } else if (!email) {
+      res.status(400).send("Invalid email");
+      return;
+    } else if (!username) {
+      res.status(400).send("Invalid username");
+      return;
+    }
+    const [duplicateUsername, duplicateEmail, user] = await Promise.all([
+      dao.findUserByUsername(username),
+      dao.findUserByEmail(email),
+      dao.findUserById(userId),
+    ]);
+    if (duplicateUsername) {
+      res.status(400).send("Username is taken");
+      return;
+    } else if (duplicateEmail) {
+      res.status(400).send("Email is taken");
+      return;
+    }
+
     if (!user) {
       res.sendStatus(404);
       return;
     }
-    const users = user.following;
-    const following = db.users
-      .filter((user) => users.includes(user._id))
-      .map((user) => removingPassword(user));
-    res.send(following);
+    const updatedUser: User = {
+      ...user,
+      username: username.toLowerCase(),
+      name,
+      email: email.toLowerCase(),
+    };
+    const success = await dao.updateUser(updatedUser);
+    if (!success) {
+      res.sendStatus(400);
+      return;
+    }
+    res.send(updatedUser);
   });
-  app.get("/user/:id/followers", async (req, res) => {
-    const { id } = req.params;
-    if (!db.users.find((user) => user._id === id)) {
+
+  app.put("/users/:userId/password", async (req, res) => {
+    const { userId } = req.params;
+    if (!authenticated(req, userId)) {
+      res.sendStatus(401);
+      return;
+    }
+
+    const { oldPassword, newPassword } = req.body;
+    if (!newPassword) {
+      res.status(400).send("Invalid password");
+      return;
+    }
+    if (!(await dao.findUserWithIdPassword(userId, oldPassword))) {
+      res.sendStatus(401);
+      return;
+    }
+
+    const success = await dao.updateUserPassword(userId, newPassword);
+    if (!success) {
+      res.sendStatus(400);
+      return;
+    }
+    res.send("success");
+  });
+
+  app.delete("/users/:userId", (req, res) => {
+    const { userId } = req.params;
+    if (!authenticated(req, userId)) {
+      res.sendStatus(401);
+      return;
+    }
+    const success = dao.deleteUser(userId);
+    if (!success) {
+      res.sendStatus(400);
+      return;
+    }
+    res.send("success");
+  });
+
+  // Follower Routes
+  app.get("/users/:userId/following", async (req, res) => {
+    const { userId } = req.params;
+    const user = await dao.findUserById(userId);
+    if (!user) {
       res.sendStatus(404);
       return;
     }
-    const followers = db.users
-      .filter((user) => user.following.includes(id))
-      .map((user) => removingPassword(user));
+    const following = await dao.findUsersByUserIds(user.following);
+    res.send(following);
+  });
+
+  app.get("/users/:userId/followers", async (req, res) => {
+    const { userId } = req.params;
+    const followers = await dao.findUsersFollowing(userId);
     res.send(followers);
   });
-  app.post("/user/:id/following/:followingId", async (req, res) => {
-    const { id, followingId } = req.params;
-    if (!authenticated(req, res, id)) {
+
+  app.post("/users/:userId/following/:followingId", async (req, res) => {
+    const { userId, followingId } = req.params;
+    if (!authenticated(req, userId)) {
+      res.sendStatus(401);
       return;
     }
-    db.users = db.users.map((user) => {
-      if (user._id === id && !user.following.includes(followingId)) {
-        const updatedFollowing = [...user.following, followingId];
-        return {
-          ...user,
-          following: updatedFollowing,
-        };
-      } else {
-        return user;
-      }
-    });
+    const user = await dao.findUserById(userId);
+    if (!user) {
+      res.sendStatus(404);
+      return;
+    }
+    const updatedUser: User = {
+      ...user,
+      following: [...user.following, followingId],
+    };
+    const success = await dao.updateUser(updatedUser);
+    if (!success) {
+      res.sendStatus(400);
+      return;
+    }
     res.send(followingId);
   });
-  app.delete("/user/:id/following/:followingId", async (req, res) => {
-    const { id, followingId } = req.params;
-    if (!authenticated(req, res, id)) {
+
+  app.delete("/users/:userId/following/:followingId", async (req, res) => {
+    const { userId, followingId } = req.params;
+    if (!authenticated(req, userId)) {
+      res.sendStatus(401);
       return;
     }
-    db.users = db.users.map((user) => {
-      if (user._id === id) {
-        const updatedFollowing = user.following.filter(
-          (id) => id !== followingId
-        );
-        return {
-          ...user,
-          following: updatedFollowing,
-        };
-      } else {
-        return user;
-      }
-    });
+    const user = await dao.findUserById(userId);
+    if (!user) {
+      res.sendStatus(404);
+      return;
+    }
+    const updatedUser: User = {
+      ...user,
+      following: user.following.filter((id) => id !== followingId),
+    };
+    const success = await dao.updateUser(updatedUser);
+    if (!success) {
+      res.sendStatus(400);
+      return;
+    }
     res.sendStatus(200);
   });
-  app.get("/user/:id/reviews", async (req, res) => {
-    const { id } = req.params;
-    const reviews = db.reviews.filter((review) => review.userId === id);
-    res.send(reviews);
+
+  // Account Routes
+  app.post("/account/login", async (req, res) => {
+    const { username, password } = req.body;
+    const user = await dao.findUserWithUsernamePassword(username, password);
+    if (!user) {
+      res.send(undefined);
+      return;
+    }
+    req.session.user = user;
+    res.send(user);
   });
-  app.get("/user/:id/likes", async (req, res) => {
-    const { id } = req.params;
-    const reviews = db.reviews.filter((review) => review.likes.includes(id));
-    res.send(reviews);
-  });
-  app.get("/user/:id/lists", async (req, res) => {
-    const { id } = req.params;
-    const lists = db.lists.filter((list) => list.userId === id);
-    res.send(lists);
+
+  app.post("/account/logout", async (req, res) => {
+    req.session.destroy((error) => {
+      if (error) {
+        res.sendStatus(500);
+      } else {
+        res.send("success");
+      }
+    });
   });
 };
 export default UserRoutes;

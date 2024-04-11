@@ -10,21 +10,39 @@ const tmdbAxios = axios.create({
 });
 
 export async function searchMovies(query: string): Promise<Movie[]> {
-  const response = await tmdbAxios.get(`/search/movie?query=${query}&page=1`);
-  return response.data.results;
+  try {
+    const response = await tmdbAxios.get(`/search/movie?query=${query}&page=1`);
+    return response.data.results;
+  } catch {
+    return [];
+  }
 }
 
-export async function moveDetails(id: string): Promise<MovieDetails> {
-  const response = await tmdbAxios.get(`/movie/${id}`);
-  return response.data;
+export async function moveDetails(
+  id: string
+): Promise<MovieDetails | undefined> {
+  try {
+    const response = await tmdbAxios.get(`/movie/${id}`);
+    return response.data;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function similarMovies(id: string): Promise<Movie[]> {
-  const response = await tmdbAxios.get(`/movie/${id}/similar`);
-  return response.data.results;
+  try {
+    const response = await tmdbAxios.get(`/movie/${id}/similar`);
+    return response.data.results;
+  } catch {
+    return [];
+  }
 }
 
 export async function movieCast(id: string): Promise<CastMember[]> {
-  const response = await tmdbAxios.get(`/movie/${id}/credits`);
-  return response.data.cast;
+  try {
+    const response = await tmdbAxios.get(`/movie/${id}/credits`);
+    return response.data.cast;
+  } catch {
+    return [];
+  }
 }
