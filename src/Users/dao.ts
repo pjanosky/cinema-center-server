@@ -8,7 +8,7 @@ function parseUser(user: UserDocument): User {
     name: user.name,
     email: user.email,
     role: user.role,
-    following: user.following.map(toString),
+    following: user.following.map((id) => id.toString()),
   };
 }
 
@@ -55,23 +55,41 @@ export async function findUserByEmail(
     return undefined;
   }
 }
+
 export async function findUsersByUserIds(userIds: string[]): Promise<User[]> {
   try {
     const documents = await model.find({
-      $in: userIds,
+      _id: { $in: userIds },
     });
     return documents.map(parseUser);
   } catch {
     return [];
   }
 }
-
-export async function findUsersByQuery(query: string): Promise<User[]> {
+export async function findUsersByQuery({
+  query,
+  userIds,
+}: {
+  query: string | undefined;
+  userIds: string[] | undefined;
+}): Promise<User[]> {
+  const queryFilter = {
+    $or: [
+      { name: { $regex: query, $options: "i" } },
+      { username: { $regex: query, $options: "i" } },
+    ],
+  };
+  const userIdFilter = {
+    _id: {
+      $in: userIds,
+    },
+  };
   try {
     const documents = await model.find({
-      $or: [
-        { name: { $regex: query, $options: "i" } },
-        { username: { $regex: query, $options: "i" } },
+      $and: [
+        {},
+        ...(query ? [queryFilter] : []),
+        ...(userIds ? [userIdFilter] : []),
       ],
     });
     return documents.map(parseUser);

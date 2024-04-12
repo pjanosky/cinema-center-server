@@ -2,6 +2,7 @@ import { Express } from "express";
 import { authenticated } from "../authentication";
 import * as dao from "./dao";
 import * as reviewDao from "../Reviews/dao";
+import * as listsDao from "../Lists/dao";
 import { NewUser, User } from "./types";
 
 declare module "express-session" {
@@ -14,7 +15,7 @@ const UserRoutes = (app: Express) => {
   // User Routes
   app.get("/users/:userId", async (req, res) => {
     let { userId } = req.params;
-    if (userId === "me") {
+    if (userId === "current") {
       if (!req.session.user) {
         res.sendStatus(401);
         return;
@@ -31,23 +32,14 @@ const UserRoutes = (app: Express) => {
 
   app.get("/users", async (req, res) => {
     const { likedReview, query } = req.query;
-    if ([likedReview, query].every((param) => !param)) {
-      res.status(400).send("must specify a query parameter");
-      return;
-    }
-
-    if (query) {
-      const users = await dao.findUsersByQuery(query as string);
-      res.send(users);
-    } else {
-      const review = await reviewDao.findReviewById(likedReview as string);
-      if (!review) {
-        res.sendStatus(404);
-        return;
-      }
-      const users = await dao.findUsersByUserIds(review.likes);
-      res.send(users);
-    }
+    const review = likedReview
+      ? await reviewDao.findReviewById(likedReview as string)
+      : undefined;
+    const users = await dao.findUsersByQuery({
+      query: query as string | undefined,
+      userIds: review?.likes || undefined,
+    });
+    res.send(users);
   });
 
   app.post("/users", async (req, res) => {
@@ -93,10 +85,11 @@ const UserRoutes = (app: Express) => {
       res.sendStatus(400);
       return;
     }
+    req.session.user = newUser;
     res.send(newUser);
   });
 
-  app.put("/users/:userId/account", async (req, res) => {
+  app.put("/users/:userId/information", async (req, res) => {
     const { userId } = req.params;
     if (!authenticated(req, userId)) {
       res.sendStatus(401);
@@ -114,15 +107,15 @@ const UserRoutes = (app: Express) => {
       res.status(400).send("Invalid username");
       return;
     }
-    const [duplicateUsername, duplicateEmail, user] = await Promise.all([
+    const [usernameUser, emailUser, user] = await Promise.all([
       dao.findUserByUsername(username),
       dao.findUserByEmail(email),
       dao.findUserById(userId),
     ]);
-    if (duplicateUsername) {
+    if (usernameUser && usernameUser._id !== userId) {
       res.status(400).send("Username is taken");
       return;
-    } else if (duplicateEmail) {
+    } else if (emailUser && emailUser._id !== userId) {
       res.status(400).send("Email is taken");
       return;
     }
@@ -170,13 +163,18 @@ const UserRoutes = (app: Express) => {
     res.send("success");
   });
 
-  app.delete("/users/:userId", (req, res) => {
+  app.delete("/users/:userId", async (req, res) => {
     const { userId } = req.params;
     if (!authenticated(req, userId)) {
       res.sendStatus(401);
       return;
     }
-    const success = dao.deleteUser(userId);
+    const results = await Promise.all([
+      dao.deleteUser(userId),
+      reviewDao.deleteReviewsByUserId(userId),
+      listsDao.deleteListsByUserId(userId),
+    ]);
+    const success = results.every((result) => result);
     if (!success) {
       res.sendStatus(400);
       return;
@@ -202,8 +200,9 @@ const UserRoutes = (app: Express) => {
     res.send(followers);
   });
 
-  app.post("/users/:userId/following/:followingId", async (req, res) => {
-    const { userId, followingId } = req.params;
+  app.post("/users/:userId/following/", async (req, res) => {
+    const { userId } = req.params;
+    const { followingId } = req.body;
     if (!authenticated(req, userId)) {
       res.sendStatus(401);
       return;
@@ -253,7 +252,7 @@ const UserRoutes = (app: Express) => {
     const { username, password } = req.body;
     const user = await dao.findUserWithUsernamePassword(username, password);
     if (!user) {
-      res.send(undefined);
+      res.sendStatus(401);
       return;
     }
     req.session.user = user;

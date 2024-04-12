@@ -12,12 +12,7 @@ const reviewSchema = new mongoose.Schema(
       required: true,
     },
     movieId: { type: String, required: true },
-    likes: {
-      type: [mongoose.Schema.Types.ObjectId],
-      ref: "UserModel",
-      required: true,
-      default: [],
-    },
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "UserModel" }],
   },
   { collection: "reviews" }
 );

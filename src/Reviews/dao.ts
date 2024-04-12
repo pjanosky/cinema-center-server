@@ -3,12 +3,14 @@ import { NewReview, Rating, Review, ReviewDocument } from "./types";
 
 function parseReview(document: ReviewDocument): Review {
   return {
-    ...document,
     _id: document._id.toString(),
     rating: document.rating as Rating,
     userId: document.userId.toString(),
-    likes: document.likes.map(toString),
+    likes: document.likes.map((like) => like.toString()),
     date: document.date.toISOString(),
+    title: document.title,
+    content: document.content,
+    movieId: document.movieId,
   };
 }
 
@@ -79,6 +81,15 @@ export async function deleteReview(reviewId: string): Promise<boolean> {
   try {
     const result = await model.deleteOne({ _id: reviewId });
     return result.deletedCount === 1;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteReviewsByUserId(userId: string): Promise<boolean> {
+  try {
+    const result = await model.deleteMany({ userId });
+    return result.acknowledged;
   } catch {
     return false;
   }

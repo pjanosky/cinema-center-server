@@ -16,19 +16,22 @@ export default function ListRoutes(app: Express) {
 
   app.get("/lists", async (req, res) => {
     const { userId, movieId } = req.query;
-    if ([userId, movieId].every((param) => !param)) {
-      res.status(400).send("must specify a query parameter");
-      return;
-    }
     const lists = await dao.findListsByQuery({
-      userId: userId as string,
-      movieId: movieId as string,
+      userId: userId as string | undefined,
+      movieId: movieId as string | undefined,
     });
     res.send(lists);
   });
 
   app.post("/lists", async (req, res) => {
     const { title, description } = req.body;
+    if (!title) {
+      res.status(400).send("Invalid title");
+      return;
+    } else if (!description) {
+      res.status(400).send("Invalid description");
+      return;
+    }
     const user = authenticatedEditor(req);
     if (!user) {
       res.sendStatus(401);
@@ -43,6 +46,10 @@ export default function ListRoutes(app: Express) {
     };
 
     const newList = await dao.createList(list);
+    if (!newList) {
+      res.sendStatus(400);
+      return;
+    }
     res.send(newList);
   });
 
@@ -63,7 +70,7 @@ export default function ListRoutes(app: Express) {
     const updatedList = { ...list, title, description };
     const success = await dao.updateList(updatedList);
     if (!success) {
-      res.send(400);
+      res.sendStatus(400);
       return;
     }
     res.send(updatedList);
@@ -84,23 +91,27 @@ export default function ListRoutes(app: Express) {
 
     const success = await dao.deleteList(listId);
     if (!success) {
-      res.send(400);
+      res.sendStatus(400);
       return;
     }
     res.sendStatus(200);
   });
 
-  app.post("/lists/:listId/entry/:movieId", async (req, res) => {
-    const { listId, movieId } = req.params;
-    const { description } = req.body;
+  app.post("/lists/:listId/entries", async (req, res) => {
+    const { listId } = req.params;
+    const { movieId, description } = req.body;
+    if (!description) {
+      res.status(400).send("Invalid description");
+      return;
+    }
 
     const list = await dao.getListById(listId);
     if (!list) {
-      res.send(404);
+      res.sendStatus(404);
       return;
     }
     if (!authenticatedEditor(req, list.userId)) {
-      res.send(401);
+      res.sendStatus(401);
       return;
     }
 
@@ -116,23 +127,23 @@ export default function ListRoutes(app: Express) {
     };
     const success = await dao.updateList(updatedList);
     if (!success) {
-      res.send(400);
+      res.sendStatus(400);
       return;
     }
     res.send(updatedList);
   });
 
-  app.put("/lists/:listId/entry/:movieId", async (req, res) => {
+  app.put("/lists/:listId/entries/:movieId", async (req, res) => {
     const { listId, movieId } = req.params;
     const { description } = req.body;
 
     const list = await dao.getListById(listId);
     if (!list) {
-      res.send(404);
+      res.sendStatus(404);
       return;
     }
     if (!authenticatedEditor(req, list.userId)) {
-      res.send(401);
+      res.sendStatus(401);
       return;
     }
 
@@ -142,22 +153,22 @@ export default function ListRoutes(app: Express) {
     const updatedList: List = { ...list, entries: updatedEntires };
     const success = await dao.updateList(updatedList);
     if (!success) {
-      res.send(400);
+      res.sendStatus(400);
       return;
     }
     res.send({ movieId, description });
   });
 
-  app.delete("/lists/:listId/entry/:movieId", async (req, res) => {
+  app.delete("/lists/:listId/entries/:movieId", async (req, res) => {
     const { listId, movieId } = req.params;
 
     const list = await dao.getListById(listId);
     if (!list) {
-      res.send(404);
+      res.sendStatus(404);
       return;
     }
     if (!authenticatedEditor(req, list.userId)) {
-      res.send(401);
+      res.sendStatus(401);
       return;
     }
 
@@ -167,7 +178,7 @@ export default function ListRoutes(app: Express) {
     const updatedList: List = { ...list, entries: updatedEntires };
     const success = await dao.updateList(updatedList);
     if (!success) {
-      res.send(400);
+      res.sendStatus(400);
       return;
     }
     res.sendStatus(200);
