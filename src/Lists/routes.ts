@@ -2,6 +2,7 @@ import { Express } from "express";
 import { authenticatedEditor } from "../authentication";
 import * as dao from "./dao";
 import { List, NewList } from "./types";
+import { SortOrder } from "mongoose";
 
 export default function ListRoutes(app: Express) {
   app.get("/lists/:listId", async (req, res) => {
@@ -15,10 +16,15 @@ export default function ListRoutes(app: Express) {
   });
 
   app.get("/lists", async (req, res) => {
-    const { userId, movieId } = req.query;
+    const { userId, movieId, sort, order, limit } = req.query;
     const lists = await dao.findListsByQuery({
       userId: userId as string | undefined,
       movieId: movieId as string | undefined,
+      sort: sort as string,
+      order: ["asc", "desc"].includes(order as string)
+        ? (order as SortOrder)
+        : undefined,
+      limit: parseInt(limit as string),
     });
     res.send(lists);
   });

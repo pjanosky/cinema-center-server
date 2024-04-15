@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const reviewSchema = new mongoose.Schema(
   {
     date: { type: Date, required: true },
-    rating: { type: String, required: true, enum: [1, 2, 3, 4, 5] },
+    rating: { type: Number, required: true, enum: [1, 2, 3, 4, 5] },
     title: { type: String, required: true },
     content: { type: String, required: true },
     userId: {

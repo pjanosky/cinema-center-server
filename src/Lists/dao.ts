@@ -1,3 +1,4 @@
+import { SortOrder } from "mongoose";
 import model from "./model";
 import { List, ListDocument, NewList } from "./types";
 
@@ -60,18 +61,27 @@ export async function deleteListsByUserId(userId: string): Promise<boolean> {
 export async function findListsByQuery({
   userId,
   movieId,
+  sort = "date",
+  order = "desc",
+  limit = 1000,
 }: {
   userId: string | undefined;
   movieId: string | undefined;
+  sort: string | undefined;
+  order: SortOrder | undefined;
+  limit: number | undefined;
 }): Promise<List[]> {
   try {
-    const documents = await model.find({
-      $and: [
-        {},
-        ...(userId ? [{ userId: userId }] : []),
-        ...(movieId ? [{ "entries.movieId": movieId }] : []),
-      ],
-    });
+    const documents = await model
+      .find({
+        $and: [
+          {},
+          ...(userId ? [{ userId: userId }] : []),
+          ...(movieId ? [{ "entries.movieId": movieId }] : []),
+        ],
+      })
+      .sort([[sort, order]])
+      .limit(limit);
     const d = documents.map(parseList);
     return d;
   } catch {

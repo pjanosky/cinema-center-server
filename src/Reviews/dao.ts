@@ -1,3 +1,4 @@
+import { SortOrder } from "mongoose";
 import model from "./model";
 import { NewReview, Rating, Review, ReviewDocument } from "./types";
 
@@ -27,21 +28,34 @@ export async function findReviewById(
 
 export async function findReviewsByQuery({
   userId,
+  userIds,
   likedBy,
   movieId,
+  sort = "date",
+  order = "desc",
+  limit = 1000,
 }: {
   userId: string | undefined;
+  userIds: string[] | undefined;
   likedBy: string | undefined;
   movieId: string | undefined;
+  sort: string | undefined;
+  order: SortOrder | undefined;
+  limit: number | undefined;
 }): Promise<Review[]> {
   try {
-    const documents = await model.find({
-      $and: [
-        ...(userId ? [{ userId }] : []),
-        ...(likedBy ? [{ likes: likedBy }] : []),
-        ...(movieId ? [{ movieId }] : []),
-      ],
-    });
+    const documents = await model
+      .find({
+        $and: [
+          {},
+          ...(userId ? [{ userId }] : []),
+          ...(userIds ? [{ userId: { $in: userIds } }] : []),
+          ...(likedBy ? [{ likes: likedBy }] : []),
+          ...(movieId ? [{ movieId }] : []),
+        ],
+      })
+      .sort([[sort, order]])
+      .limit(limit);
     return documents.map(parseReview);
   } catch {
     return [];

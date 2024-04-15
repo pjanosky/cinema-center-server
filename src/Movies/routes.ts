@@ -6,7 +6,7 @@ const MovieRoutes = (app: Express) => {
   app.get("/movies", async (req, res) => {
     const { query } = req.query;
     const movies = await client.searchMovies((query as string).toLowerCase());
-    res.send(movies);
+    res.send(movies.slice(0, 10));
   });
 
   app.get("/movies/:movieId", async (req, res) => {
@@ -29,8 +29,8 @@ const MovieRoutes = (app: Express) => {
 
     const movieInfo = {
       ...details,
-      similar: similar.slice(0, 10),
-      cast: cast.toSorted((a, b) => a.order - b.order).slice(0, 10),
+      similar: similar.slice(0, 5),
+      cast: cast.toSorted((a, b) => a.order - b.order).slice(0, 5),
       stars,
     };
     res.send(movieInfo);

@@ -2,14 +2,34 @@ import { Express } from "express";
 import { authenticatedUser } from "../authentication";
 import { NewReview } from "./types";
 import * as dao from "./dao";
+import * as usersDao from "../Users/dao";
+import { SortOrder } from "mongoose";
 
 export default function ReviewRoutes(app: Express) {
   app.get("/reviews", async (req, res) => {
-    const { userId, likedBy, movieId } = req.query;
+    const { userId, likedBy, movieId, followedBy, sort, order, limit } =
+      req.query;
+
+    let userIds: string[] | undefined = undefined;
+    if (followedBy) {
+      const user = await usersDao.findUserById(followedBy as string);
+      if (!user) {
+        res.sendStatus(404);
+        return;
+      }
+      userIds = user?.following;
+    }
+
     const reviews = await dao.findReviewsByQuery({
       userId: userId as string,
+      userIds: userIds,
       likedBy: likedBy as string,
       movieId: movieId as string,
+      sort: sort as string,
+      order: ["asc", "desc"].includes(order as string)
+        ? (order as SortOrder)
+        : undefined,
+      limit: parseInt(limit as string),
     });
     res.send(reviews);
   });
