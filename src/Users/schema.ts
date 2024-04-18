@@ -11,13 +11,16 @@ const userSchema = new mongoose.Schema(
       required: true,
       enum: ["user", "editor"],
     },
-    following: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "UserModel",
-        required: true,
-      },
-    ],
+    following: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "UserModel",
+        },
+      ],
+      required: false,
+    },
+    bio: { type: String, required: false },
   },
   { collection: "users" }
 );

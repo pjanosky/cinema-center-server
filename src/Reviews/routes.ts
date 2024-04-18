@@ -4,6 +4,7 @@ import { NewReview } from "./types";
 import * as dao from "./dao";
 import * as usersDao from "../Users/dao";
 import { SortOrder } from "mongoose";
+import { isWatcherUser } from "../Users/types";
 
 export default function ReviewRoutes(app: Express) {
   app.get("/reviews", async (req, res) => {
@@ -17,7 +18,9 @@ export default function ReviewRoutes(app: Express) {
         res.sendStatus(404);
         return;
       }
-      userIds = user?.following;
+      if (isWatcherUser(user)) {
+        userIds = user?.following;
+      }
     }
 
     const reviews = await dao.findReviewsByQuery({
@@ -29,7 +32,7 @@ export default function ReviewRoutes(app: Express) {
       order: ["asc", "desc"].includes(order as string)
         ? (order as SortOrder)
         : undefined,
-      limit: parseInt(limit as string),
+      limit: limit ? parseInt(limit as string) : 1000,
     });
     res.send(reviews);
   });

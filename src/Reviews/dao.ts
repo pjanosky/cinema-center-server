@@ -85,7 +85,7 @@ export async function createReview(
 export async function updateReview(review: Review): Promise<boolean> {
   try {
     const result = await model.updateOne({ _id: review._id }, { $set: review });
-    return result.modifiedCount === 1;
+    return result.matchedCount === 1;
   } catch {
     return false;
   }

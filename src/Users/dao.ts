@@ -1,15 +1,27 @@
+import { ObjectId } from "mongoose";
 import model from "./model";
 import { User, UserDocument, NewUser } from "./types";
 
 function parseUser(user: UserDocument): User {
-  return {
-    _id: user._id.toString(),
-    username: user.username,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    following: user.following.map((id) => id.toString()),
-  };
+  if (user.role === "editor") {
+    return {
+      _id: user._id.toString(),
+      username: user.username,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      bio: user.bio!,
+    };
+  } else {
+    return {
+      _id: user._id.toString(),
+      username: user.username,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      following: user.following!.map((id) => id.toString()),
+    };
+  }
 }
 
 export async function createUser(user: NewUser): Promise<User | undefined> {
@@ -134,7 +146,7 @@ export async function findUserWithIdPassword(
 export async function updateUser(user: User): Promise<boolean> {
   try {
     const result = await model.updateOne({ _id: user._id }, { $set: user });
-    return result.modifiedCount === 1;
+    return result.matchedCount === 1;
   } catch {
     return false;
   }
@@ -149,7 +161,7 @@ export async function updateUserPassword(
       { _id: userId },
       { $set: { password } }
     );
-    return result.modifiedCount === 1;
+    return result.matchedCount === 1;
   } catch {
     return false;
   }

@@ -3,7 +3,7 @@ import { authenticated } from "../authentication";
 import * as dao from "./dao";
 import * as reviewDao from "../Reviews/dao";
 import * as listsDao from "../Lists/dao";
-import { NewUser, User } from "./types";
+import { NewUser, User, isEditorUser, isWatcherUser } from "./types";
 
 declare module "express-session" {
   interface SessionData {
@@ -78,7 +78,7 @@ const UserRoutes = (app: Express) => {
       name,
       email: email.toLowerCase(),
       role,
-      following: [],
+      ...(role === "editor" ? { bio: "" } : { following: [] }),
     };
     const newUser = await dao.createUser(user);
     if (!newUser) {
@@ -96,7 +96,7 @@ const UserRoutes = (app: Express) => {
       return;
     }
 
-    const { username, name, email } = req.body;
+    const { username, name, email, bio } = req.body;
     if (!name) {
       res.status(400).send("Invalid name");
       return;
@@ -112,16 +112,18 @@ const UserRoutes = (app: Express) => {
       dao.findUserByEmail(email),
       dao.findUserById(userId),
     ]);
+    if (!user) {
+      res.send(404);
+      return;
+    }
     if (usernameUser && usernameUser._id !== userId) {
       res.status(400).send("Username is taken");
       return;
     } else if (emailUser && emailUser._id !== userId) {
       res.status(400).send("Email is taken");
       return;
-    }
-
-    if (!user) {
-      res.sendStatus(404);
+    } else if (isEditorUser(user) && !bio) {
+      res.status(400).send("Invalid bio");
       return;
     }
     const updatedUser: User = {
@@ -129,6 +131,7 @@ const UserRoutes = (app: Express) => {
       username: username.toLowerCase(),
       name,
       email: email.toLowerCase(),
+      ...(isEditorUser(user) ? { bio } : {}),
     };
     const success = await dao.updateUser(updatedUser);
     if (!success) {
@@ -190,6 +193,10 @@ const UserRoutes = (app: Express) => {
       res.sendStatus(404);
       return;
     }
+    if (!isWatcherUser(user)) {
+      res.sendStatus(400);
+      return;
+    }
     const following = await dao.findUsersByUserIds(user.following);
     res.send(following);
   });
@@ -210,6 +217,11 @@ const UserRoutes = (app: Express) => {
     const user = await dao.findUserById(userId);
     if (!user) {
       res.sendStatus(404);
+      return;
+    }
+
+    if (!isWatcherUser(user)) {
+      res.sendStatus(400);
       return;
     }
     const updatedUser: User = {
@@ -233,6 +245,10 @@ const UserRoutes = (app: Express) => {
     const user = await dao.findUserById(userId);
     if (!user) {
       res.sendStatus(404);
+      return;
+    }
+    if (!isWatcherUser(user)) {
+      res.sendStatus(400);
       return;
     }
     const updatedUser: User = {

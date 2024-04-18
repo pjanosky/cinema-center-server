@@ -34,7 +34,7 @@ export async function createList(list: NewList): Promise<List | undefined> {
 export async function updateList(list: List): Promise<boolean> {
   try {
     const result = await model.updateOne({ _id: list._id }, { $set: list });
-    return result.modifiedCount === 1;
+    return result.matchedCount === 1;
   } catch {
     return false;
   }
@@ -64,12 +64,14 @@ export async function findListsByQuery({
   sort = "date",
   order = "desc",
   limit = 1000,
+  query,
 }: {
   userId: string | undefined;
   movieId: string | undefined;
   sort: string | undefined;
   order: SortOrder | undefined;
   limit: number | undefined;
+  query: string | undefined;
 }): Promise<List[]> {
   try {
     const documents = await model
@@ -78,13 +80,15 @@ export async function findListsByQuery({
           {},
           ...(userId ? [{ userId: userId }] : []),
           ...(movieId ? [{ "entries.movieId": movieId }] : []),
+          ...(query ? [{ title: { $regex: query, $options: "i" } }] : []),
         ],
       })
       .sort([[sort, order]])
       .limit(limit);
     const d = documents.map(parseList);
     return d;
-  } catch {
+  } catch (error) {
+    console.log(error);
     return [];
   }
 }
