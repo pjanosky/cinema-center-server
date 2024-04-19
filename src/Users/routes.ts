@@ -174,6 +174,7 @@ const UserRoutes = (app: Express) => {
     }
     const results = await Promise.all([
       dao.deleteUser(userId),
+      dao.deleteFollower(userId),
       reviewDao.deleteReviewsByUserId(userId),
       listsDao.deleteListsByUserId(userId),
     ]);

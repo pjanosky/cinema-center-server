@@ -175,3 +175,15 @@ export async function deleteUser(userId: string): Promise<boolean> {
     return false;
   }
 }
+
+export async function deleteFollower(userId: string): Promise<boolean> {
+  try {
+    const result = await model.updateMany(
+      { following: userId },
+      { $pull: { following: userId } }
+    );
+    return result.acknowledged;
+  } catch {
+    return false;
+  }
+}
